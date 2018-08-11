@@ -16,18 +16,21 @@ BACKUP_INI = 'backup.ini'
 
 class Backup:
     def __init__(self, verbose_member=False):
-        self.verbose = verbose_member
-        self.last_date = None
-        self.last_backup_folder = None
+        self.always = []                # Folders that will always be backed up
+        self.backup = None              # Backup folder (where the backups will be saved)
+        self.base_folders = []          # Base folder to be checked to see if backup is needed
+        self.checked = False            # If there are new folders found under the base folders, this will be True
+        self.excluded = []              # Folders that will never be backed up
+        self.individual = []            # Individual files to be backed up, not under the base folders
+        self.last_backup_folder = None  # Folder under the backup folder, with the date of the last backup
+        self.last_date = None           # Date of the last backup (or None)
+        self.modified = False           # If a folder under the base folder has been modified, a backup is needed
+        self.normal = []                # The folders that will be backed up if needed (moved, if not)
+        # Folder under the backup folder, with the date of the last backup
         self.this_backup_folder = datetime.today().strftime("%Y%m%d")
-        self.base_folders = []
-        self.backup = None  # backup directory
-        self.always = []
-        self.excluded = []
-        self.normal = []
-        self.individual = []
-        section = 0
+        self.verbose = verbose_member   # If verbose, no commands will be executed, they will be displayed
 
+        section = 0
         try:
             # Open the .ini file
             with open(BACKUP_INI, READ) as file:
@@ -84,10 +87,11 @@ class Backup:
 
         except FileNotFoundError:
             # always, excluded & normal are empty
-            pass
+            # Create an empty ini file
+            self._exit('backup.ini file created...')
 
-        self.modified = False
-        self.checked = False    # If there are new folders found, this will be True
+        if not self.backup:
+            self._exit('Please indicate the backup folder in the backup.ini file.')
 
     def __del__(self):
         # If there are new folders found, this will be True
@@ -102,35 +106,33 @@ class Backup:
         with open(BACKUP_INI, WRITE) as file:
             file.write('[Backup date]\n')
             file.write('# Date (YYYYMMDD) since the last backup empty if for first backup.\n')
-            file.write(self.this_backup_folder)
-            file.write('\n')
+            if self.this_backup_folder:
+                file.write(f'{self.this_backup_folder}\n')
             file.write('\n')
 
             file.write('[Base folders]\n')
             file.write('# These are the top most folders. Subfolders will be analyzed.\n')
             file.write('# Base folders are not backed up themselves.\n')
             for line in self.base_folders:
-                file.write(line)
-                file.write('\n')
+                file.write(f'{line}\n')
             file.write('\n')
 
             file.write('[Backup folder]\n')
             file.write('# This is where the backup will be saved.\n')
-            file.write(f'{self.backup}\n')
+            if self.backup:
+                file.write(f'{self.backup}\n')
             file.write('\n')
 
             file.write('[Always]\n')
             file.write('# Folders that are always backed up because the content changes anyway.\n')
             for line in self.always:
-                file.write(line)
-                file.write('\n')
+                file.write(f'{line}\n')
             file.write('\n')
 
             file.write('[Excluded]\n')
             file.write('# Folders that are never backed up because you don\'t want to back them up.\n')
             for line in self.excluded:
-                file.write(line)
-                file.write('\n')
+                file.write(f'{line}\n')
             file.write('\n')
 
             file.write('[Normal]\n')
@@ -138,8 +140,7 @@ class Backup:
             file.write('#   If the folder has been modified, it will be backed up.\n')
             file.write('#   Otherwise, the folder will be moved to the new backup.\n')
             for line in self.normal:
-                file.write(line)
-                file.write('\n')
+                file.write(f'{line}\n')
             file.write('\n')
 
             file.write('[Individual files]\n')
@@ -147,8 +148,7 @@ class Backup:
             file.write('#     For instance /etc/hosts\n')
             file.write('#     The program has no means of discovering these files, so add them ... individually.\n')
             for line in self.individual:
-                file.write(line)
-                file.write('\n')
+                file.write(f'{line}\n')
 
     def _check_folders(self, path):
         # The goal is to find out if there was a modification
@@ -336,6 +336,16 @@ class Backup:
         if self.verbose:
             print('FIN Make tarball')
 
+    def _exit(self, message):
+        self.backup = None              # Backup folder (where the backups will be saved)
+        self.checked = False            # If there are new folders found under the base folders, this will be True
+        self.last_backup_folder = None  # Folder under the backup folder, with the date of the last backup
+        self.last_date = None           # Date of the last backup (or None)
+        self.modified = False           # If a folder under the base folder has been modified, a backup is needed
+        self.verbose = False            # If verbose, no commands will be executed, they will be displayed
+        self.this_backup_folder = None  # Folder under the backup folder, with the date of the last backup
+        print(message)
+        exit()
 
 if __name__ == '__main__':
     tStart = datetime.now()
