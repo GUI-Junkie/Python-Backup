@@ -274,12 +274,13 @@ class Backup:
 
     def _backup(self, path):
         # tar -czvf /path/destine.tar.gz /path/origin
-        i = path.rfind('/') + 1
-        visible_name = path[i:]
-        visible_name = visible_name.replace('.', '')
+        # Full name to guarantee no file is overwritten
+        backup_file_name = path.replace('/', '')
+        backup_file_name = backup_file_name.replace('.', '')
+
         # If the folder was modified since the last backup, create a new tarball
         if self.modified:
-            command = f'tar -czf "{self.backup}/{self.this_backup_folder}/{visible_name}.tar.gz" "{path}"'
+            command = f'tar -czf "{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar.gz" "{path}"'
             if self.verbose:
                 print(command)
             else:
@@ -290,7 +291,7 @@ class Backup:
             # If the folder was not modified, just move the tarball to the next backup_folder
             if self.last_backup_folder \
              and self.last_backup_folder != self.this_backup_folder:
-                command = f'mv "{self.backup}/{self.last_backup_folder}/{visible_name}.tar.gz" ' \
+                command = f'mv "{self.backup}/{self.last_backup_folder}/{backup_file_name}.tar.gz" ' \
                           f'"{self.backup}/{self.this_backup_folder}/"'
                 if self.verbose:
                     print(command)
@@ -299,9 +300,9 @@ class Backup:
                     p.wait()
 
     def _make_tarball(self, path):
-        i = path.rfind('/') + 1
-        visible_name = path[i:]
-        visible_name = visible_name.replace('.', '')
+        # Full name to guarantee no file is overwritten
+        backup_file_name = path.replace('/', '')
+        backup_file_name = backup_file_name.replace('.', '')
 
         if self.verbose:
             print('Make tarball')
@@ -309,7 +310,7 @@ class Backup:
             local_file = f'{path}/{local_path}'
             if not isdir(local_file) and '.' != local_path[0]:
                 # Make a local path to add to the tar file
-                command = f'tar -rf "{self.backup}/{self.this_backup_folder}/{visible_name}.tar" "{local_file}"'
+                command = f'tar -rf "{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar" "{local_file}"'
                 if self.verbose:
                     print(command)
                 else:
@@ -317,8 +318,8 @@ class Backup:
                     p.wait()
 
         # Make the tarball
-        command = f'gzip -c "{self.backup}/{self.this_backup_folder}/{visible_name}.tar" > ' \
-                  f'"{self.backup}/{self.this_backup_folder}/{visible_name}.tar.gz"'
+        command = f'gzip -c "{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar" > ' \
+                  f'"{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar.gz"'
         if self.verbose:
             print(command)
         else:
@@ -326,7 +327,7 @@ class Backup:
             p.wait()
 
         # Remove the tar file
-        command = f'rm "{self.backup}/{self.this_backup_folder}/{visible_name}.tar"'
+        command = f'rm "{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar"'
         if self.verbose:
             print(command)
         else:
