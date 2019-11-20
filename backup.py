@@ -14,6 +14,21 @@ WRITE = 'w'
 BACKUP_INI = 'backup.ini'
 
 
+class PipeError(Exception):
+    pass
+
+
+def pipe(command):
+    with Popen(command, stdout=PIPE, stderr=PIPE, shell=True) as proc:
+        err = proc.stderr.read().decode()
+        # out = proc.stdout.read().decode()
+        # print(f"Out: {out}")
+        if err:
+            if "Removing leading `/' from member names" not in err:
+                print(f"Error executing command: {command}")
+                raise PipeError(err)
+
+
 class Backup:
     def __init__(self, verbose_member=False):
         self.always = []                # Folders that will always be backed up
@@ -217,23 +232,20 @@ class Backup:
             if self.verbose:
                 print(command)
             else:
-                p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-                p.wait()
+                pipe(command)
 
         command = f'gzip -c "{self.backup}/{self.this_backup_folder}/individual.tar" > ' \
                   f'"{self.backup}/{self.this_backup_folder}/individual.tar.gz"'
         if self.verbose:
             print(command)
         else:
-            p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-            p.wait()
+            pipe(command)
 
         command = f'rm "{self.backup}/{self.this_backup_folder}/individual.tar"'
         if self.verbose:
             print(command)
         else:
-            p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-            p.wait()
+            pipe(command)
 
     def _check_new(self):
         # Below these base folders are "always", "excluded" and "normal" folders
@@ -284,8 +296,7 @@ class Backup:
             if self.verbose:
                 print(command)
             else:
-                p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-                p.wait()
+                pipe(command)
 
         else:
             # If the folder was not modified, just move the tarball to the next backup_folder
@@ -296,10 +307,12 @@ class Backup:
                 if self.verbose:
                     print(command)
                 else:
-                    p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-                    p.wait()
+                    pipe(command)
 
     def _make_tarball(self, path):
+        # Only execute gzip if there is a tar file to prevent errors
+        b_no_tar = True
+
         # Full name to guarantee no file is overwritten
         backup_file_name = path.replace('/', '')
         backup_file_name = backup_file_name.replace('.', '')
@@ -308,14 +321,22 @@ class Backup:
             print('Make tarball')
         for local_path in listdir(path):
             local_file = f'{path}/{local_path}'
+            if self.verbose:
+                print(local_file)
             if not isdir(local_file) and '.' != local_path[0]:
                 # Make a local path to add to the tar file
                 command = f'tar -rf "{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar" "{local_file}"'
+                b_no_tar = False
                 if self.verbose:
                     print(command)
                 else:
-                    p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-                    p.wait()
+                    pipe(command)
+
+        # Only execute gzip if there is a tar file to prevent errors
+        if b_no_tar:
+            if self.verbose:
+                print('No tarball made')
+            return
 
         # Make the tarball
         command = f'gzip -c "{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar" > ' \
@@ -323,16 +344,14 @@ class Backup:
         if self.verbose:
             print(command)
         else:
-            p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-            p.wait()
+            pipe(command)
 
         # Remove the tar file
         command = f'rm "{self.backup}/{self.this_backup_folder}/{backup_file_name}.tar"'
         if self.verbose:
             print(command)
         else:
-            p = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
-            p.wait()
+            pipe(command)
 
         if self.verbose:
             print('FIN Make tarball')
@@ -348,20 +367,32 @@ class Backup:
         print(message)
         exit()
 
+
 if __name__ == '__main__':
-    tStart = datetime.now()
+    start_time = datetime.now()
 
     # print command line arguments
     verbose = False
+    # verbose = True
     for arg in argv[1:]:
         if '-v' == arg:
+            print("Verbose on")
             verbose = True
 
     backup = Backup(verbose)
-    backup.go()
+    try:
+        backup.go()
+    except PipeError as err:
+        # Prevent __del__ from making a new backup.ini file
+        backup.verbose = True
+        print(err)
 
+    # If not verbose and no new folders found, make a new backup.ini file with the current date
     backup = None
 
-    tFin = datetime.now()
-    tDiff = tFin - tStart
-    print("\nDuration:", ''.join([str(tDiff.seconds), ":", str(tDiff.microseconds)]))
+    stop_time = datetime.now()
+    time_delta = stop_time - start_time
+
+    hours, remainder = divmod(time_delta.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    print("\nDuration:", f'{hours:02d}:{minutes:02d}:{seconds:02d} and {time_delta.microseconds} microseconds')
