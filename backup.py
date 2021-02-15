@@ -91,6 +91,10 @@ class Backup:
                                 print(command)
                             else:
                                 mkdir(self.backup)
+                        else:
+                            # Clean-up the backup drive
+                            # Remove outdated backup folders
+                            self.cleanup_drive()
                     elif 4 == section:
                         self.always.append(line[:-1])
                     elif 5 == section:
@@ -366,6 +370,16 @@ class Backup:
         self.this_backup_folder = None  # Folder under the backup folder, with the date of the last backup
         print(message)
         exit()
+
+    def cleanup_drive(self):
+        # Delete all folders except 'laptop' and self.last_backup_folder
+        path = self.backup
+        for local_path in listdir(path):
+            local_file = f'{path}/{local_path}'
+            if isdir(local_file):
+                if local_path != self.last_backup_folder and local_path != 'laptop':
+                    command = f'rm -r "{local_file}"'
+                    pipe(command)
 
 
 if __name__ == '__main__':
